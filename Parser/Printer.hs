@@ -1,5 +1,6 @@
 module Main where
 
+import Tokenizer (makeToken)
 import Parser hiding (main)
 import Decs
 import Data.List
@@ -10,8 +11,9 @@ main = do
   fileName <- getLine
   file <- readFile (fileName++".jack")
   let ast = parseString file
+  makeToken fileName
   writeFile (fileName++".xml") (toXML ast)
-  putStrLn "Completed"
+  putStrLn "Completed Parsing, Main.xml created..."
 
 type XML = String
 

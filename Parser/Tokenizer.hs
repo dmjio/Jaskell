@@ -1,4 +1,4 @@
-module Main where
+module Tokenizer where
 
 import System.Environment
 import Data.Char
@@ -101,14 +101,12 @@ parseString p str =
        Left e  -> error $ show e
        Right r -> r
 
-main :: IO ()
-main = do
-  putStrLn "Please enter the name of your jack file (i.e. Main)"
-  fileName <- getLine
+makeToken :: String -> IO ()
+makeToken fileName = do
   file <- readFile (fileName++".jack")
   let ast = parseString tkens (file)
   writeFile (fileName++"T.xml") $ ("<tokens>\n" ++ (conAST ast) ++ "</tokens>\n")
-  putStrLn $  "Completed, " ++ (fileName ++ "T.xml created...")
+  putStrLn $  "Completed Lexing, " ++ (fileName ++ "T.xml created...")
 
 conAST :: [Tkens] -> String
 conAST [] = ""
