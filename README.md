@@ -9,14 +9,11 @@ out a list of tokens in *.xml format. One for the tokens, one for the code hiera
 
 Instructions
 ---------------------------------------
+```bash
 ghc Printer.hs -o parser
-
 ./parser
-
 Please enter the name of your jack file (i.e. Main)
-
 Main
-
 Completed Lexing, MainT.xml created...
-
 Completed Parsing, Main.xml created…
+```
