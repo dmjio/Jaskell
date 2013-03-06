@@ -11,7 +11,8 @@ type VarName = String
 data Jack = Class Identifier [Declaration] deriving (Show)
 
 data Declaration = ClassVarDec Keyword Type [VarName] |
-                   SubDec Keyword Type SubName [Params] SubBody deriving (Show)
+                   SubDec Keyword Type SubName [Params] SubBody
+                   deriving (Show)
 
 data Type = TypeKey Keyword | TypeClass ClassName deriving (Show)
 
@@ -25,15 +26,17 @@ data Statement = Let Keyword VarName Expr
                | While Keyword Expr [Statement]
                | Do Keyword SubCall
                | ReturnExp Keyword Expr
+               | NoReturn
                | Return Keyword deriving (Show)
 
 data VarDec = VarDec Type [VarName] deriving (Show)
 
 data SubBody = SubBodyVar [VarDec]
                | SubBodyStatement [Statement]
-               | SubBody [VarDec] [Statement] deriving (Show)
+               | SubBody [VarDec] [Statement]
+               | NoSubBody deriving (Show)
 
-data Expr = ExprOpTerm Term [(String,Term)] deriving (Show)
+data Expr = ExprOpTerm Term [(String, Term)] deriving (Show)
 
 data Term = IntConst Integer
             | StringConst String

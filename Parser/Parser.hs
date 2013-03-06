@@ -1,7 +1,6 @@
 module Parser where
 
 import Decs
-
 import System.IO
 import Control.Monad
 import Control.Applicative hiding ((<|>),many)
@@ -78,8 +77,13 @@ subDec = do
    char '('
    list <- commaSep paramList
    char ')'
-   body <- subBody
+   body <- try subBody
    return $ SubDec keyword typ name list body
+
+noSubBody :: Parser SubBody
+noSubBody = do
+  whiteSpace
+  return NoSubBody
 
 paramList :: Parser Params
 paramList = do
@@ -90,9 +94,10 @@ paramList = do
 
 subBodyOr :: Parser SubBody
 subBodyOr = do
-  try (SubBodyVar <$> many varDecs)
- <|>
   try (SubBodyStatement <$> many statementsParser)
+ <|>
+  try (SubBodyVar <$> many varDecs)
+
 
 subBodyBoth :: Parser SubBody
 subBodyBoth = do
@@ -120,7 +125,7 @@ varDecs = do
 statementsParser :: Parser Statement
 statementsParser = do
   try subLetParser <|>  try letParser <|> try whileParser <|>
-    try ifParser <|> try ifelseParser <|>
+    try ifelseParser <|> try ifParser <|>
     try doParser <|> (try returnExpParser <|> try returnParser)
 
 doParser :: Parser Statement
@@ -146,6 +151,10 @@ returnExpParser = do
   semi
   return $ ReturnExp ret expr
 
+noRetParser :: Parser Statement
+noRetParser = do
+  return $ NoReturn
+
 whileParser :: Parser Statement
 whileParser = do
   whiteSpace
@@ -170,26 +179,41 @@ ifParser = do
   char ')'
   whiteSpace
   char '{'
+  whiteSpace
   stmt <- many statementsParser
+  whiteSpace
   char '}'
   return $ If iff expr stmt
 
+tp x y = parse x "" y
+
 ifelseParser :: Parser Statement
-ifelseParser = do
-  whiteSpace
-  iff <- reserved' "if"
-  char '('
-  expr <- getExprParser
-  char ')'
-  whiteSpace
-  char '{'
-  stmt <- many statementsParser
-  char '}'
-  el <- reserved' "else"
-  char '{'
-  stmt <- many1 statementsParser
-  char '}'
-  return $ IfElse iff expr stmt el stmt
+ifelseParser = whiteSpace >> ifelP where
+  ifelP = do
+    whiteSpace
+    iff <- reserved' "if"
+    whiteSpace
+    char '('
+    whiteSpace
+    expr <- getExprParser
+    whiteSpace
+    char ')'
+    whiteSpace
+    char '{'
+    whiteSpace
+    stmt <- many1 statementsParser
+    whiteSpace
+    char '}'
+    whiteSpace
+    el <- reserved' "else"
+    whiteSpace
+    char '{'
+    whiteSpace
+    stmts <- many1 statementsParser
+    whiteSpace
+    char '}'
+    whiteSpace
+    return $ IfElse iff expr stmt el stmts
 
 --statement parsers
 letParser :: Parser Statement
@@ -221,7 +245,7 @@ subLetParser = do
 subCallParser :: Parser SubCall
 subCallParser = do
   whiteSpace
-  try subParser <|> try classVarParser
+  try classVarParser <|> try subParser
 
 subParser :: Parser SubCall
 subParser = do
@@ -249,7 +273,6 @@ subRoutineParser = do
   sub <- subCallParser
   return $ Subroutine sub
 
-
 getExprParser :: Parser Expr
 getExprParser = do
   whiteSpace
@@ -268,12 +291,12 @@ getExpP :: Parser (String,Term)
 getExpP = do
   whiteSpace
   op <- choice $ map string ops
-  term <- (try intVal <|>
+  term <- (try subRoutineParser <|>
+          try intVal <|>
           try stringVal <|>
           try keyWordVal <|>
           try varExpParser <|>
           try varVal <|>
-          try subRoutineParser <|>
           try simpleExpr <|>
           try unaryOpExpr)
   return $ (op,term)
@@ -312,13 +335,11 @@ keyWordVal :: Parser Term
 keyWordVal = do
   whiteSpace
   try aKeys <|> try oKeys <|> try dKeys
-
 symbols :: Parser Term
 symbols = do
   whiteSpace
   op <- choice $ map string ops
   return $ Symbol op
-
 
 aKeys :: Parser Term
 aKeys = do

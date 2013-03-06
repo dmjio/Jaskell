@@ -5,6 +5,7 @@ import Parser hiding (main)
 import Decs
 import Data.List
 
+
 main :: IO ()
 main = do
   putStrLn "Please enter the name of your jack file (i.e. Main)"
