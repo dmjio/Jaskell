@@ -1,5 +1,0 @@
-method void dispose() {
-        do square.dispose();
-        do Memory.deAlloc(this);
-        return;
-    }

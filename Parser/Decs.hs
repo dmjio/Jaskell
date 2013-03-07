@@ -36,7 +36,7 @@ data SubBody = SubBodyVar [VarDec]
                | SubBody [VarDec] [Statement]
                | NoSubBody deriving (Show)
 
-data Expr = ExprOpTerm Term [(String, Term)] deriving (Show)
+data Expr = ExprOpTerm Term [(Keyword, Term)] deriving (Show)
 
 data Term = IntConst Integer
             | StringConst String

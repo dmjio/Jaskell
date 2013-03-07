@@ -4,11 +4,38 @@ import Control.Applicative
 import Debug.Trace
 import Parser (parseString)
 import Data.Maybe
+import Data.Char
 import Decs 
 
 type Name = String
 type Kind = String
 
+toSym "*" = "call Math.multiply 2"
+toSym "+" = "add"
+toSym "-" = "sub"
+toSym "&" = "and"
+toSym "|" = "or"
+toSym "=" = "eq"
+toSym "~" = "not"
+toSym "!" = "neg"
+toSym "<" = "lt"
+toSym ">" = "gt"
+toSym "/" = "call Math.divide 2"
+toSym _ = ""
+
+toStr [] = []
+toStr (x:xs) = "push constant " ++ (show $ ord x) ++ "\n" ++ appendChar ++ toStr xs
+
+appendChar = "call String.appendChar 2\n"
+
+getVarScope var func ast = case lookup var $ getClassMap ast of
+                             Just x -> "this" --what about static?
+                             Nothing -> case lookup func $ getSubDecMap ast of
+                                          Just x -> case lookup var x of
+                                                      Just (_, scope, _) -> scope
+                                                      Nothing -> ""
+                                          Nothing -> ""
+  
 getClassMap = parseClassTable 
 getSubDecMap = parseSubDecTable 
 
@@ -22,6 +49,13 @@ parseClassTable ast = case ast of
           "field" -> [(n, (typ, "field", numField))] ++ parseCVD (ClassVarDec k typ ns) numStatic (numField+1)
           "static" -> [(n, (typ, "static", numStatic))] ++ parseCVD (ClassVarDec k typ ns) (numStatic+1) numField
       parseCVD _ _ _ = []
+
+getFuncType ast func = case ast of 
+  Class ident decs -> parseDecs decs where
+    parseDecs [] = []
+    parseDecs decs = parseSVD decs where
+      parseSVD ((SubDec k typ name params body):xs) = if func == name then k else parseDecs xs
+      parseSVD (_:xs) = parseDecs xs
 
 parseSubDecTable ast = case ast of 
   Class ident decs -> parseDecs decs where
@@ -38,17 +72,17 @@ buildFuncMap ast = case ast of
       parseSVD [] = [] 
       parseSVD ((SubDec kind typ name params body):xs) = (name, kind) : parseSVD xs
 
-lastTwo (a,b,c) = (b,c)
+lastTwo (a,b,c) = ((case b of 
+                     "field" -> "this"
+                     otherwise -> b),show c)
 
-getSymNum :: String -> String -> Jack -> (String, Int)
+getSymNum :: String -> String -> Jack -> (String, String)
 getSymNum val func ast = case lookup val (getClassMap ast) of
   Just x -> lastTwo x
   Nothing -> case lookup func (getSubDecMap ast) of
     Just x -> case lookup val x of
       Just x -> lastTwo x
 
-getFuncType funcName ast = let result = lookup funcName (buildFuncMap ast)
-                           in fromJust result
 
 addParamsAndBody name key params body typ ident = [(name, ((addParams key params 0 typ ident) 
                                                            ++ (makeBody body 0)))]
@@ -70,20 +104,17 @@ makeBody (SubBodyStatement _) _ = []
       
 mkV :: [VarDec] -> Int -> [(String, (Type, String, Int))]
 mkV [] num = []
-mkV (x:xs) num = parseDec x num ++ mkV xs (length $ parseDec x num)
+mkV (x@(VarDec typ names):xs) num = parseDec x num xs
 
-parseDec :: VarDec -> Int -> [(String, (Type, String, Int))]
-parseDec (VarDec typ []) _ = []  
-parseDec (VarDec typ names) num = addNames names typ num 
+parseDec :: VarDec -> Int -> [VarDec] -> [(String, (Type, String, Int))]
+parseDec (VarDec typ []) _ _ = []  
+parseDec (VarDec typ names) num xs  = addNames names typ num xs
 
-addNames :: [String] -> Type -> Int -> [(String, (Type, String, Int))]
-addNames [] _ _ = []
-addNames (name:names) typ num = [(name, (typ, "local", num))] ++ addNames names typ (num+1)
-
--- mkVarDec (VarDec typ []) _ = []
--- mkVarDec (VarDec typ (name:names)) num = 
---   [(name, (typ, "local", num))] ++ mkVarDec (VarDec typ names) (num+1)                
-
+addNames :: [String] -> Type -> Int -> [VarDec] -> [(String, (Type, String, Int))]
+addNames [] _ _ _ = []
+addNames [name] typ num xs =  [(name, (typ, "local", num))] ++ mkV xs (num+1)
+addNames (name:names) typ num xs = [(name, (typ, "local", num))] ++ addNames names typ (num+1) xs
+         
 getSubInfo funcName ast pred = let result = lookup funcName $ getSubDecMap ast
                                in length $ filter pred $ fromJust result
 
@@ -93,8 +124,11 @@ getParamCount funcName ast = getSubInfo funcName ast (\(_,(_,arg,_)) -> arg == "
 getFuncReturnTypeList ast = case ast of 
   Class ident decs -> getd decs
 
-getClassName ast = case ast of
+getClass ast = case ast of
   Class ident decs -> ident
+
+getClassVarCount = show . length . filter isField . getClassMap where
+  isField = \(_,(_,kind,_)) -> kind == "field"
 
 getd [] = []
 getd (x:xs) = getDec x ++ getd xs where
