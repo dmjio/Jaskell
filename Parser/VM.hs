@@ -170,23 +170,6 @@ toSubCall subtype call = do
                            return $ xpr
 
 
-                           -- xpr <- case (lookup subname $ getSubDecMap env) of
-                           --                   Just x -> do  className <- return $ getClass env
-                           --                                 paramcount <- return $ (case getFuncType env subname == "method" of
-                           --                                                           True -> show $ (getParamCount subname env)+1
-                           --                                                           False -> show $ getParamCount subname env)
-                           --                                 let d  = "call " ++ getClass env ++ "." ++ subname ++ " " ++ paramcount ++ "\n"
-                           --                                 return $ d ++ toSymExp subtype expr env                              
-                           --                   Nothing -> case lookup name $ getClassMap env of -- method/func from other class
-                           --                                Just (TypeClass cname, typ, num) ->
-                           --                                    return $ "call " ++ cname ++ "." ++ 
-                           --                                    subname ++ " " ++ (show $ (+1) $ length expr)
-                           --                                Nothing -> return $ "call " ++ name ++ "." ++ 
-                           --                                           subname ++ " " ++ (show $ length $ expr) ++ "\n"
-                           -- return $ toSymExp subtype expr env ++ xpr
-
-
-
 
 
 
