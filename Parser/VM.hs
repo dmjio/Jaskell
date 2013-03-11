@@ -8,7 +8,7 @@ import Data.List
 import Data.Char
 import Control.Monad.Reader 
 import Control.Monad.Writer
-import Debug.Trace
+import Text.ParserCombinators.Parsec
 
 main = do
   putStrLn "Please enter the name of your jack file (i.e. Main)"
@@ -17,10 +17,10 @@ main = do
   writeFile (fileName++".xml")  (runReader toClass $ parseString file)
   putStrLn $  "Completed Parsing, " ++ fileName ++ ".xml created..."
 
-toClass = do { env <- ask; case env of Class ident decs -> return $ toDecs decs env }
+toClass = do { env <- ask; case env of Class ident decs -> return $ toDecs decs "0" "0" env }
 
-toDecs [] = return ""
-toDecs ((SubDec keyword typ subname params subbody):xs) = do
+toDecs [] _ _= return ""
+toDecs ((SubDec keyword typ subname params subbody):xs) num numif = do
   env <- ask
   funcName <- return $ "function " ++ getClass env ++ 
               "." ++ subname ++ " " ++ (show $ getFieldCount subname env) ++ "\n"
@@ -32,14 +32,26 @@ toDecs ((SubDec keyword typ subname params subbody):xs) = do
             "constructor" -> do return "call Memory.alloc 1\npop pointer 0\n"
             otherwise -> do return "")
   let x = funcName ++ lcl ++ res
-  return $ x ++ toSubBody subbody subname subname  env ++ toDecs xs env
+  return $ x ++ toSubBody subbody subname subname num numif env ++ toDecs xs num numif env
 
-toDecs (_:xs) = do { env <- ask; return $ toDecs xs env }
+toDecs (_:xs) num numif = do { env <- ask; return $ toDecs xs num numif env }
 
-toSubBody (SubBodyStatement states) subname subtype  = do { env <- ask; return $ toStatement "0" "0" subtype states subname env }
-toSubBody (SubBody _ states) subname subtype = do { env <- ask; return $ toStatement "0" "0" subtype states subname env }
+toSubBody (SubBodyStatement states) subname subtype num numif = do { env <- ask; return $ toStatement num numif subtype states subname env }
+toSubBody (SubBody _ states) subname subtype num numif = do { env <- ask; return $ toStatement num numif subtype states subname env }
 
-inc x = show $ (read x ::Int)+1
+inc x = show $ ( (read x ::Int)+1 )
+
+add x y = show $ (read x :: Int) + (read y :: Int)
+sub x y = show $ (read x :: Int) - (read y :: Int)
+
+toIfDepth :: [Statement] -> Int
+toIfDepth [] = 0
+toIfDepth (x:xs) = case x of
+  (If _ _ (y:ys)) -> 1 + toIfDepth xs + toIfDepth ys
+  (IfElse _ _ (y:ys) _ (z:zs)) ->  1 + toIfDepth xs  + toIfDepth ys +  toIfDepth zs 
+  otherwise -> 0
+
+tod = show . toIfDepth
 
 toStatement _ _ _ [] _ = return ""
 toStatement num numif subtype (x:xs) subname = do
@@ -56,32 +68,32 @@ toStatement num numif subtype (x:xs) subname = do
     If key expr statements -> do
          let ifs = "if-goto IF_TRUE" ++ numif ++ "\ngoto IF_FALSE" ++ numif ++  "\nlabel IF_TRUE" ++ numif ++ "\n"
              ife = "label IF_FALSE" ++ numif ++ "\n"
-         return $  toExpr subtype expr env ++ ifs ++
-                toStatement num (inc numif) subtype statements subname env ++ ife ++
-                toStatement num (inc numif) subtype xs subname env
+         return $ toExpr subtype expr env ++ ifs ++
+                toStatement num (inc numif)  subtype statements subname env ++ ife ++
+                toStatement num (add numif $ tod [x]) subtype xs subname env
     IfElse key1 expr statements1 key2 statements2 -> do
          return $ toExpr subtype expr env ++ 
                 "if-goto IF_TRUE" ++ numif ++ "\n" ++
-                "goto IF_FALSE" ++numif ++ "\n" ++
-                "label IF_TRUE" ++numif ++ "\n" ++
+                "goto IF_FALSE" ++ numif ++ "\n" ++
+                "label IF_TRUE" ++ numif ++ "\n" ++ 
                 toStatement num (inc numif) subtype statements1 subname env ++ 
-                "goto IF_END" ++numif ++ "\n"++ 
-                "label IF_FALSE" ++numif ++ "\n" ++
-                toStatement num (inc numif) subtype statements2 subname env ++  
+                "goto IF_END" ++ numif ++ "\n"++ 
+                "label IF_FALSE" ++ numif ++ "\n" ++
+                toStatement num (add (inc numif) $ (tod statements1))  subtype statements2 subname env ++  
                 "label IF_END" ++ numif ++ "\n" ++
-                toStatement num (inc numif) subtype xs subname env
+                toStatement num (add (inc numif) $ add (tod [x]) $ tod statements2 ) subtype xs subname env
     While key expr statements -> do
          let whist = "label WHILE_EXP" ++ num ++ "\n" 
              whien = "if-goto WHILE_END" ++ num ++ "\n" 
              whies = "goto WHILE_EXP"  ++ num ++ "\nlabel WHILE_END"  ++ num ++ "\n"
-         return $ whist ++ toExpr subtype expr env ++ "not\n" ++ whien ++ toStatement num numif subtype statements subname env 
+         return $ whist ++ toExpr subtype expr env ++ "not\n" ++ whien ++ toStatement (inc num) numif subtype statements subname env 
                     ++ whies ++toStatement (inc num) numif subtype xs subname env 
     Do key subcall -> do
          return $ toSubCall subtype subcall env ++ "pop temp 0\n" ++ toStatement num numif subtype xs subname env 
     ReturnExp key expr -> do
-         return $ toExpr subtype expr env ++toStatement num numif subtype xs subname env ++ "return\n"
+         return $ toExpr subtype expr env ++ toStatement num numif subtype xs subname env ++ "return\n"
     Return key -> do
-         return $ toStatement num numif subtype xs subname env ++ "push constant 0\nreturn\n"
+           return $ toStatement num numif subtype xs subname env ++ "push constant 0\nreturn\n"
 
 isNeg x = if x < 0 then "push constant " ++ (show . abs) x ++ "\nneg\n" else "push constant " ++ show x ++ "\n"
 
@@ -104,7 +116,7 @@ toTerm subtype x = do
               SimpleExpr expr ->  toExpr subtype expr env
               Unary string all@(ExprOpTerm term expr) -> toTerm subtype term env ++ "not\n"
               Subroutine sub ->  toSubCall subtype sub env 
-              Symbol x -> traceShow (toSym x) $ toSym x ++ "\n"
+              Symbol x -> toSym x ++ "\n"
   return result
 
 toExpr subtype (ExprOpTerm term opTerms) = do { env <- ask; return $ toTerm subtype term env ++ toOpTerms subtype opTerms env}
@@ -117,29 +129,45 @@ toSymExp subtype [] = return []
 toSymExp subtype [x] = do { env <- ask; return $ toExpr subtype  x env }
 toSymExp subtype (x:xs) = do { env <- ask; return $ toExpr subtype x env ++ toSymExp subtype xs env }
 
+toC name subtype env =  "push " ++ scope ++ " " ++ cname ++ "\n" where
+    scope = fst val
+    cname = snd val
+    val = getSymNum name subtype env
+
 toSubCall subtype call = do
   env <- ask
   case call of
     SubCaller subname expr -> do -- do moveSquare(); 
                         className <- return $ getClass env
                         paramcount <- return $ (case (getFuncType env subname)  == "method" of
-                                        True -> show $ (getParamCount subname env)+1
+                                        True -> case getFuncType env subname of
+                                                  "method" -> show $ ((getParamCount subname env)+1)
+                                                  "function" -> show $ (getParamCount subname env)
                                         False -> show $ getParamCount subname env)
                         let x  = "call " ++ className ++ "." ++ subname ++ " " ++ paramcount ++ "\n"
-                        return $ toSymExp subtype expr env ++ x
+                        return $ "push pointer 0\n" ++ toSymExp subtype expr env ++ x
 
     ClassCall name subname expr -> do --Keyboard.readInt() or square.moveDown()
                            xpr <- return $ case (isUpper $ head name) of
                                     True -> case (getClass env == name) of
                                               --own class func
-                                              True -> "call " ++ name ++ "." ++ subname ++ " " ++ show (getParamCount subname env) ++ "\n"
+                                              True ->  toSymExp subtype expr env ++ "call " ++ name ++ "." ++ subname ++ " " ++ show (getParamCount subname env) ++ "\n"
                                                --other class func
-                                              False -> "call " ++ name ++ "." ++ subname ++ " " ++ (show $ length expr) ++ "\n"
+                                              False ->  toSymExp subtype expr env ++  "call " ++ name ++ "." ++ subname ++ " " ++ (show $ length expr) ++ "\n"
                                     False -> case (lookup name $ getClassMap env) of
                                                --other class method
-                                               Just (TypeClass cname, typ, num) -> "call " ++ cname ++ "." ++ 
-                                                                                   subname ++ " " ++ (show $ (length expr)+1 ) ++ "\n"
-                           return $ toSymExp subtype expr env ++ xpr
+                                               Just (TypeClass cname, typ, num) ->  toC name subtype env ++  toSymExp subtype expr env ++ "call " ++ cname ++ "." ++ 
+                                                                                   subname ++ " " ++ (show $ (length expr)+1 ) ++ "\n" 
+                                                                                  
+                                               --my class method
+                                               Nothing -> case lookup subtype $ getSubDecMap env of
+                                                            Just x -> case lookup name x of --other class method
+                                                                        Just (TypeClass t, scope, num) -> "push local 0\ncall " ++ t ++ 
+                                                                                                          "." ++ subname ++ " " ++ 
+                                                                                                                  (show $ (length expr)+1) ++ "\n" ++  toSymExp subtype expr env
+                                                                        Nothing -> ""
+                                                            --other class method
+                           return $ xpr
 
 
                            -- xpr <- case (lookup subname $ getSubDecMap env) of

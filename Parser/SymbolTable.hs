@@ -111,7 +111,7 @@ parseDec (VarDec typ []) _ _ = []
 parseDec (VarDec typ names) num xs  = addNames names typ num xs
 
 addNames :: [String] -> Type -> Int -> [VarDec] -> [(String, (Type, String, Int))]
-addNames [] _ _ _ = []
+getaddNames [] _ _ _ = []
 addNames [name] typ num xs =  [(name, (typ, "local", num))] ++ mkV xs (num+1)
 addNames (name:names) typ num xs = [(name, (typ, "local", num))] ++ addNames names typ (num+1) xs
          
