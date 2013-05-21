@@ -25,7 +25,7 @@ class Main {
 }
 ```
 
-VM Commands
+VM Command Output
 ---------------------------------------
 
 ```txt
@@ -42,7 +42,7 @@ push constant 0
 return
 ```
 
-Output
+XML Token Output
 ---------------------------------------
 ```xml
 <tokens>
@@ -89,6 +89,8 @@ Output
 </tokens>
 ```
 
+XML Class Hierarchy Output
+---------------------------------------
 ```xml
 <class>
   <keyword> class </keyword>
