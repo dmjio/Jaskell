@@ -7,18 +7,20 @@ type ClassName = String
 type SubName = String
 type VarName = String
 
---program structure
+-- | Program structure
+
 data Jack = Class Identifier [Declaration] deriving (Show)
 
 data Declaration = ClassVarDec Keyword Type [VarName] |
                    SubDec Keyword Type SubName [Params] SubBody
                    deriving (Show)
 
-data Type = TypeKey Keyword | TypeClass ClassName deriving (Show)
+data Type = TypeKey Keyword
+          | TypeClass ClassName deriving (Show)
 
 data Params = Params (Type, VarName) deriving (Show)
 
---Statements
+-- | Statements
 data Statement = Let Keyword VarName Expr
                | SubLet Keyword VarName Expr Expr
                | If Keyword Expr [Statement]
@@ -64,19 +66,6 @@ ops =  ["+", "-", "*", "/", "&", "|", "&", "<", ">", "=", "." ]
 
 unaryops = ["~", "-"]
 
-getOp :: String -> Op
-getOp x = case x of
-  "+" -> Add
-  "-" -> Subtract
-  "*" -> Multiply
-  "/" -> Divide
-  "&" -> And
-  "|" -> Or
-  "<" -> Less
-  ">" -> Greater
-  "=" -> Equals
-  "." -> Dot
-  otherwise -> NullOp
 
 getUnaryOp :: String -> UnaryOp
 getUnaryOp x = case x of
